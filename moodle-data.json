@@ -1,0 +1,10 @@
+{
+    "course": {
+      "id": 123,
+      "name": "Sample Course"
+    },
+    "user": {
+      "id": 456,
+      "name": "John Doe"
+    }
+  }
