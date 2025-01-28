@@ -1,44 +1,48 @@
-document.getElementById("ltiForm").addEventListener("submit", async () => {
-    const consumerKey = document.getElementById("oauth_consumer_key").value;
-    const signature = document.getElementById("oauth_signature").value;
+(async function () {
+    const urlParams = new URLSearchParams(window.location.search);
+    const idToken = urlParams.get("id_token"); // LTI 1.3 launch sends an id_token
+    const resultDiv = document.getElementById("result");
   
-    // Validate LTI Launch Request (basic example)
-    const isValid = validateLTI(consumerKey, signature);
-    if (!isValid) {
-      document.getElementById("result").innerText = "Invalid LTI Request!";
+    if (!idToken) {
+      resultDiv.innerText = "No id_token found. This is not a valid LTI 1.3 launch.";
       return;
     }
   
-    // Fetch data from Moodle (replace with your Moodle endpoint)
-    const data = await fetchMoodleData();
-    displayResult(data);
-  });
+    // Decode JWT (requires a library like jwt-decode or custom decoding)
+    const decoded = parseJwt(idToken);
+    console.log("Decoded LTI Data:", decoded);
   
-  function validateLTI(consumerKey, signature) {
-    // Simplified validation logic (for demo purposes only)
-    const expectedKey = "example_consumer_key"; // Replace with your real key
-    const expectedSignature = "example_signature"; // Replace with your real signature
-    return consumerKey === expectedKey && signature === expectedSignature;
-  }
-  
-  async function fetchMoodleData() {
-    // Simulating an API call to Moodle (use actual API URL)
-    const response = await fetch("moodle-data.json"); // Replace with Moodle API endpoint
-    if (response.ok) {
-      return response.json();
-    } else {
-      return { error: "Failed to fetch data from Moodle." };
+    // Verify JWT (signature, issuer, audience, etc.)
+    const isValid = await verifyJwt(idToken, decoded);
+    if (!isValid) {
+      resultDiv.innerText = "Invalid id_token.";
+      return;
     }
+  
+    resultDiv.innerHTML = `
+      <h2>LTI Launch Data</h2>
+      <pre>${JSON.stringify(decoded, null, 2)}</pre>
+    `;
+  })();
+  
+  // Decode JWT
+  function parseJwt(token) {
+    const [header, payload] = token.split(".").slice(0, 2);
+    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
   }
   
-  function displayResult(data) {
-    const resultDiv = document.getElementById("result");
-    if (data.error) {
-      resultDiv.innerText = data.error;
-    } else {
-      resultDiv.innerHTML = `
-        <h2>Fetched Moodle Data:</h2>
-        <pre>${JSON.stringify(data, null, 2)}</pre>
-      `;
-    }
+  // Verify JWT (requires fetching JWKS for public key verification)
+  async function verifyJwt(idToken, decoded) {
+    const jwksUri = decoded.iss + "/.well-known/jwks.json"; // JWKS URL from Moodle
+    const response = await fetch(jwksUri);
+    const jwks = await response.json();
+  
+    // Find the matching key in the JWKS set
+    const key = jwks.keys.find((key) => key.kid === decoded.header.kid);
+    if (!key) return false;
+  
+    // Verify JWT using the key (this part requires crypto libraries in JS)
+    // Use libraries like `jsonwebtoken` or `@panva/jose` in a server-side implementation.
+    return true; // Placeholder: replace with actual signature verification logic.
   }
+  
